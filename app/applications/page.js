@@ -13,6 +13,14 @@ const statuses = [
   { label: "Accepted", value: "ACCEPTED" },
 ];
 
+function serializeApplication(application) {
+  return {
+    ...application,
+    createdAt: application.createdAt.toISOString(),
+    updatedAt: application.updatedAt.toISOString(),
+  };
+}
+
 export default async function ApplicationsPage() {
   const { userId } = await auth();
 
@@ -28,8 +36,13 @@ export default async function ApplicationsPage() {
       id: true,
       title: true,
       companyName: true,
+      description: true,
+      url: true,
       location: true,
+      jobType: true,
       status: true,
+      createdAt: true,
+      updatedAt: true,
     },
     orderBy: {
       createdAt: "desc",
@@ -40,7 +53,7 @@ export default async function ApplicationsPage() {
     <main className="flex flex-1 bg-slate-50">
       <ApplicationsWorkspace
         statuses={statuses}
-        initialApplications={applications}
+        initialApplications={applications.map(serializeApplication)}
       />
     </main>
   );

@@ -10,8 +10,17 @@ export default async function Home() {
   }
 
   return (
-    <main className="flex flex-1 bg-[radial-gradient(circle_at_top,#dff7f2_0,#f8fafc_34rem)]">
-      <section className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-7xl flex-col items-center justify-center px-4 py-20 text-center sm:px-6 lg:px-8">
+    <main className="relative flex flex-1 overflow-hidden bg-[radial-gradient(circle_at_top,#dff7f2_0,#f8fafc_34rem)]">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-36 -left-28 h-96 w-96 rounded-full bg-[radial-gradient(circle,#dff7f2_0,rgba(223,247,242,0.42)_38%,rgba(248,250,252,0)_72%)]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute right-[-11rem] top-1/2 h-[30rem] w-[30rem] -translate-y-1/2 rounded-full bg-[radial-gradient(circle,#dff7f2_0,rgba(223,247,242,0.6)_50%,rgba(248,250,252,0)_72%)]"
+      />
+
+      <section className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col items-center justify-center px-4 py-12 text-center sm:px-6 sm:py-16 lg:px-8">
         <div className="max-w-4xl">
           <p className="mx-auto inline-flex rounded-full border border-teal-200 bg-white px-4 py-2 text-sm font-medium text-teal-800 shadow-sm">
             A focused workspace for your job search

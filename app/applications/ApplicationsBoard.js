@@ -54,12 +54,24 @@ function ApplicationCard({
   application,
   isDragging,
   isUpdating,
+  onClick,
   onDragStart,
   onDragEnd,
 }) {
+  function handleKeyDown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onClick(event, application);
+    }
+  }
+
   return (
     <article
       draggable={!isUpdating}
+      role="button"
+      tabIndex={isUpdating ? -1 : 0}
+      onClick={(event) => onClick(event, application)}
+      onKeyDown={handleKeyDown}
       onDragStart={(event) => onDragStart(event, application.id)}
       onDragEnd={onDragEnd}
       className={`cursor-grab rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md active:cursor-grabbing ${
@@ -101,12 +113,14 @@ export default function ApplicationsBoard({
   statuses,
   applications,
   onApplicationsChange,
+  onApplicationSelect,
 }) {
   const router = useRouter();
   const scrollContainerRef = useRef(null);
   const autoScrollFrameRef = useRef(null);
   const latestDragClientXRef = useRef(0);
   const isDraggingRef = useRef(false);
+  const lastDragEndedAtRef = useRef(null);
   const [draggingId, setDraggingId] = useState("");
   const [activeDropStatus, setActiveDropStatus] = useState("");
   const [updatingId, setUpdatingId] = useState("");
@@ -194,10 +208,23 @@ export default function ApplicationsBoard({
     setErrorMessage("");
   }
 
-  function handleDragEnd() {
+  function handleDragEnd(event) {
     stopAutoScroll();
+    lastDragEndedAtRef.current = event.timeStamp;
     setDraggingId("");
     setActiveDropStatus("");
+  }
+
+  function handleCardClick(event, application) {
+    const recentlyDragged =
+      lastDragEndedAtRef.current !== null &&
+      event.timeStamp - lastDragEndedAtRef.current < 250;
+
+    if (isDraggingRef.current || recentlyDragged || updatingId) {
+      return;
+    }
+
+    onApplicationSelect(application);
   }
 
   async function handleDrop(event, nextStatus) {
@@ -235,6 +262,14 @@ export default function ApplicationsBoard({
       return;
     }
 
+    if (result.application) {
+      onApplicationsChange((currentApplications) =>
+        currentApplications.map((item) =>
+          item.id === applicationId ? result.application : item,
+        ),
+      );
+    }
+
     router.refresh();
     requestAnimationFrame(() => {
       if (scrollContainerRef.current) {
@@ -256,7 +291,7 @@ export default function ApplicationsBoard({
         onDragOver={handleBoardDragOver}
         className="overflow-x-auto pb-4"
       >
-        <div className="grid min-w-[1680px] grid-cols-7 gap-5">
+        <div className="grid min-w-[1840px] grid-cols-7 gap-2">
           {statuses.map((status) => {
             const statusApplications = applicationsByStatus[status.value];
             const isActiveDropTarget = activeDropStatus === status.value;
@@ -290,6 +325,7 @@ export default function ApplicationsBoard({
                         application={application}
                         isDragging={draggingId === application.id}
                         isUpdating={updatingId === application.id}
+                        onClick={handleCardClick}
                         onDragStart={handleDragStart}
                         onDragEnd={handleDragEnd}
                       />
