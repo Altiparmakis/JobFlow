@@ -2,10 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { celebrateAcceptedApplication } from "@/lib/confetti";
 import { updateJobApplicationStatus } from "./actions";
 
 const AUTO_SCROLL_EDGE_SIZE = 96;
 const AUTO_SCROLL_MAX_SPEED = 24;
+const ACCEPTED_STATUS = "ACCEPTED";
 
 function BuildingIcon() {
   return (
@@ -243,6 +245,9 @@ export default function ApplicationsBoard({
       return;
     }
 
+    const previousStatus = application.status;
+    const shouldCelebrateAccepted =
+      previousStatus !== ACCEPTED_STATUS && nextStatus === ACCEPTED_STATUS;
     const previousApplications = applications;
     const nextApplications = applications.map((item) =>
       item.id === applicationId ? { ...item, status: nextStatus } : item,
@@ -252,30 +257,39 @@ export default function ApplicationsBoard({
     setUpdatingId(applicationId);
     setErrorMessage("");
 
-    const result = await updateJobApplicationStatus(applicationId, nextStatus);
-
-    setUpdatingId("");
-
-    if (!result.success) {
-      onApplicationsChange(previousApplications);
-      setErrorMessage(result.message);
-      return;
+    if (shouldCelebrateAccepted) {
+      celebrateAcceptedApplication();
     }
 
-    if (result.application) {
-      onApplicationsChange((currentApplications) =>
-        currentApplications.map((item) =>
-          item.id === applicationId ? result.application : item,
-        ),
-      );
-    }
+    try {
+      const result = await updateJobApplicationStatus(applicationId, nextStatus);
 
-    router.refresh();
-    requestAnimationFrame(() => {
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollLeft = currentScrollLeft;
+      if (!result.success) {
+        onApplicationsChange(previousApplications);
+        setErrorMessage(result.message);
+        return;
       }
-    });
+
+      if (result.application) {
+        onApplicationsChange((currentApplications) =>
+          currentApplications.map((item) =>
+            item.id === applicationId ? result.application : item,
+          ),
+        );
+      }
+
+      router.refresh();
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollLeft = currentScrollLeft;
+        }
+      });
+    } catch {
+      onApplicationsChange(previousApplications);
+      setErrorMessage("Application could not be updated.");
+    } finally {
+      setUpdatingId("");
+    }
   }
 
   return (

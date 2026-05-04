@@ -2,9 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { celebrateAcceptedApplication } from "@/lib/confetti";
 import { deleteJobApplication, updateJobApplication } from "./actions";
 import AddApplicationModal from "./AddApplicationModal";
 import ApplicationsBoard from "./ApplicationsBoard";
+
+const ACCEPTED_STATUS = "ACCEPTED";
 
 const jobTypeLabels = {
   INTERNSHIP: "Internship",
@@ -260,8 +263,17 @@ function ApplicationDetailsModal({
       formData.append(key, value);
     });
 
+    const previousStatus = application.status;
+    const shouldCelebrateAccepted =
+      previousStatus !== ACCEPTED_STATUS &&
+      nextValues.status === ACCEPTED_STATUS;
+
     setIsSaving(true);
     setSaveError("");
+
+    if (shouldCelebrateAccepted) {
+      celebrateAcceptedApplication();
+    }
 
     try {
       const result = await onUpdate(application.id, formData);
