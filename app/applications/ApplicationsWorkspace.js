@@ -111,6 +111,19 @@ function EditField({ label, required, children }) {
   );
 }
 
+function EmptyApplicationsState() {
+  return (
+    <div className="rounded-lg border border-dashed border-teal-200 bg-teal-50/60 px-5 py-5 sm:px-6">
+      <p className="text-base font-semibold text-slate-950">
+        No applications yet.
+      </p>
+      <p className="mt-1 text-sm text-slate-600">
+        Start tracking your first opportunity.
+      </p>
+    </div>
+  );
+}
+
 function ApplicationNotesPanel({
   notes,
   noteContent,
@@ -1021,6 +1034,7 @@ export default function ApplicationsWorkspace({ statuses, initialApplications })
   const [applications, setApplications] = useState(initialApplications);
   const [selectedApplication, setSelectedApplication] = useState(null);
   const totalJobs = applications.length;
+  const hasNoApplications = totalJobs === 0;
 
   function handleApplicationCreated(application) {
     if (!application) {
@@ -1189,6 +1203,8 @@ export default function ApplicationsWorkspace({ statuses, initialApplications })
           </p>
         </div>
       </div>
+
+      {hasNoApplications ? <EmptyApplicationsState /> : null}
 
       <ApplicationsBoard
         statuses={statuses}
