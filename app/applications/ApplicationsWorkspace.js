@@ -1,16 +1,21 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { celebrateAcceptedApplication } from "@/lib/confetti";
 import {
   createApplicationNote,
   deleteApplicationNote,
   deleteJobApplication,
+  updateJobApplicationFavorite,
   updateApplicationNote,
   updateJobApplication,
 } from "./actions";
 import AddApplicationModal from "./AddApplicationModal";
+import ApplicationsFilterModal, {
+  APPLICATION_FILTER_DEFAULTS,
+  getNormalizedApplicationFilters,
+} from "./ApplicationsFilterModal";
 import ApplicationsBoard from "./ApplicationsBoard";
 
 const ACCEPTED_STATUS = "ACCEPTED";
@@ -121,6 +126,166 @@ function EmptyApplicationsState() {
         Start tracking your first opportunity.
       </p>
     </div>
+  );
+}
+
+function EmptyFilteredApplicationsState() {
+  return (
+    <div className="rounded-lg border border-dashed border-slate-300 bg-white px-5 py-5 sm:px-6">
+      <p className="text-base font-semibold text-slate-950">
+        No applications match these filters.
+      </p>
+    </div>
+  );
+}
+
+function FilterIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4.75 6.75h14.5M7.75 12h8.5M10.25 17.25h3.5"
+      />
+    </svg>
+  );
+}
+
+function getDateBoundary(value, boundary) {
+  if (!value) {
+    return null;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  const date =
+    boundary === "end"
+      ? new Date(year, month - 1, day, 23, 59, 59, 999)
+      : new Date(year, month - 1, day);
+  const time = date.getTime();
+
+  return Number.isNaN(time) ? null : time;
+}
+
+function getTimestamp(value) {
+  const time = new Date(value).getTime();
+
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function compareText(firstValue, secondValue) {
+  return String(firstValue ?? "")
+    .trim()
+    .localeCompare(String(secondValue ?? "").trim(), "en", {
+      sensitivity: "base",
+      numeric: true,
+    });
+}
+
+function compareDateDescending(firstValue, secondValue) {
+  return getTimestamp(secondValue) - getTimestamp(firstValue);
+}
+
+function compareApplications(firstApplication, secondApplication, orderBy) {
+  if (orderBy === "title") {
+    return (
+      compareText(firstApplication.title, secondApplication.title) ||
+      compareDateDescending(
+        firstApplication.updatedAt,
+        secondApplication.updatedAt,
+      ) ||
+      compareText(firstApplication.id, secondApplication.id)
+    );
+  }
+
+  const dateField = orderBy === "createdAt" ? "createdAt" : "updatedAt";
+
+  return (
+    compareDateDescending(
+      firstApplication[dateField],
+      secondApplication[dateField],
+    ) ||
+    compareText(firstApplication.title, secondApplication.title) ||
+    compareText(firstApplication.id, secondApplication.id)
+  );
+}
+
+function getVisibleApplications(applications, filters) {
+  const normalizedFilters = getNormalizedApplicationFilters(filters);
+  const fromTime = getDateBoundary(normalizedFilters.appliedFrom, "start");
+  const untilTime = getDateBoundary(normalizedFilters.appliedUntil, "end");
+
+  return applications
+    .filter((application) => {
+      const createdTime = getTimestamp(application.createdAt);
+
+      if (
+        normalizedFilters.roleFilter &&
+        application.jobType !== normalizedFilters.roleFilter
+      ) {
+        return false;
+      }
+
+      if (
+        normalizedFilters.statusFilter &&
+        application.status !== normalizedFilters.statusFilter
+      ) {
+        return false;
+      }
+
+      if (normalizedFilters.favoritesOnly && !application.isFavorite) {
+        return false;
+      }
+
+      if (fromTime !== null && createdTime < fromTime) {
+        return false;
+      }
+
+      if (untilTime !== null && createdTime > untilTime) {
+        return false;
+      }
+
+      return true;
+    })
+    .slice()
+    .sort((firstApplication, secondApplication) =>
+      compareApplications(
+        firstApplication,
+        secondApplication,
+        normalizedFilters.orderBy,
+      ),
+    );
+}
+
+function hasActiveDateFilters(filters) {
+  return Boolean(filters.appliedFrom || filters.appliedUntil);
+}
+
+function hasActiveRoleOrStatusFilters(filters) {
+  return Boolean(filters.roleFilter || filters.statusFilter);
+}
+
+function hasActiveFavoriteFilter(filters) {
+  return Boolean(filters.favoritesOnly);
+}
+
+function hasActiveFilterOptions(filters) {
+  return (
+    filters.orderBy !== APPLICATION_FILTER_DEFAULTS.orderBy ||
+    hasActiveDateFilters(filters) ||
+    hasActiveRoleOrStatusFilters(filters) ||
+    hasActiveFavoriteFilter(filters)
   );
 }
 
@@ -1031,10 +1196,24 @@ function ApplicationDetailsModal({
 
 export default function ApplicationsWorkspace({ statuses, initialApplications }) {
   const router = useRouter();
+  const favoriteRequestIdsRef = useRef({});
   const [applications, setApplications] = useState(initialApplications);
   const [selectedApplication, setSelectedApplication] = useState(null);
+  const [filters, setFilters] = useState({
+    ...APPLICATION_FILTER_DEFAULTS,
+  });
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [favoriteErrorMessage, setFavoriteErrorMessage] = useState("");
+  const visibleApplications = useMemo(
+    () => getVisibleApplications(applications, filters),
+    [applications, filters],
+  );
   const totalJobs = applications.length;
+  const visibleJobs = visibleApplications.length;
+  const hasActiveFilters = hasActiveFilterOptions(filters);
   const hasNoApplications = totalJobs === 0;
+  const hasNoVisibleApplications =
+    totalJobs > 0 && visibleJobs === 0 && hasActiveFilters;
 
   function handleApplicationCreated(application) {
     if (!application) {
@@ -1052,7 +1231,15 @@ export default function ApplicationsWorkspace({ statuses, initialApplications })
   }
 
   function handleApplicationsChange(nextApplications) {
-    setApplications(nextApplications);
+    setApplications((currentApplications) => {
+      const nextApplicationsById = new Map(
+        nextApplications.map((application) => [application.id, application]),
+      );
+
+      return currentApplications.map(
+        (application) => nextApplicationsById.get(application.id) ?? application,
+      );
+    });
     setSelectedApplication((currentApplication) => {
       if (!currentApplication) {
         return currentApplication;
@@ -1064,6 +1251,116 @@ export default function ApplicationsWorkspace({ statuses, initialApplications })
         ) ?? currentApplication
       );
     });
+  }
+
+  async function handleApplicationFavoriteToggle(application, isFavorite) {
+    if (!application?.id) {
+      return {
+        success: false,
+        message: "Favorite status could not be updated.",
+      };
+    }
+
+    const applicationId = application.id;
+    const previousApplication =
+      applications.find((item) => item.id === applicationId) ?? application;
+    const requestId = (favoriteRequestIdsRef.current[applicationId] ?? 0) + 1;
+
+    favoriteRequestIdsRef.current[applicationId] = requestId;
+    setFavoriteErrorMessage("");
+    setApplications((currentApplications) =>
+      currentApplications.map((item) =>
+        item.id === applicationId ? { ...item, isFavorite } : item,
+      ),
+    );
+    setSelectedApplication((currentApplication) =>
+      currentApplication?.id === applicationId
+        ? { ...currentApplication, isFavorite }
+        : currentApplication,
+    );
+
+    try {
+      const result = await updateJobApplicationFavorite(applicationId, isFavorite);
+
+      if (favoriteRequestIdsRef.current[applicationId] !== requestId) {
+        return result;
+      }
+
+      if (result.success) {
+        const savedApplication =
+          result.application ?? { ...previousApplication, isFavorite };
+
+        setApplications((currentApplications) =>
+          currentApplications.map((item) =>
+            item.id === applicationId ? savedApplication : item,
+          ),
+        );
+        setSelectedApplication((currentApplication) =>
+          currentApplication?.id === applicationId
+            ? savedApplication
+            : currentApplication,
+        );
+        return result;
+      }
+
+      setApplications((currentApplications) =>
+        currentApplications.map((item) =>
+          item.id === applicationId ? previousApplication : item,
+        ),
+      );
+      setSelectedApplication((currentApplication) =>
+        currentApplication?.id === applicationId
+          ? previousApplication
+          : currentApplication,
+      );
+      setFavoriteErrorMessage(
+        result.message || "Favorite status could not be updated.",
+      );
+
+      return result;
+    } catch {
+      if (favoriteRequestIdsRef.current[applicationId] === requestId) {
+        setApplications((currentApplications) =>
+          currentApplications.map((item) =>
+            item.id === applicationId ? previousApplication : item,
+          ),
+        );
+        setSelectedApplication((currentApplication) =>
+          currentApplication?.id === applicationId
+            ? previousApplication
+            : currentApplication,
+        );
+        setFavoriteErrorMessage("Favorite status could not be updated.");
+      }
+
+      return {
+        success: false,
+        message: "Favorite status could not be updated.",
+      };
+    } finally {
+      if (favoriteRequestIdsRef.current[applicationId] === requestId) {
+        delete favoriteRequestIdsRef.current[applicationId];
+      }
+    }
+  }
+
+  function openFilterModal() {
+    setIsFilterModalOpen(true);
+  }
+
+  function closeFilterModal() {
+    setIsFilterModalOpen(false);
+  }
+
+  function handleClearFilters(
+    nextFilters = { ...APPLICATION_FILTER_DEFAULTS },
+  ) {
+    setFilters(getNormalizedApplicationFilters(nextFilters));
+  }
+
+  function handleSearchApplications(nextFilters) {
+    setFilters(getNormalizedApplicationFilters(nextFilters));
+    setIsFilterModalOpen(false);
   }
 
   async function handleApplicationUpdate(applicationId, formData) {
@@ -1196,20 +1493,54 @@ export default function ApplicationsWorkspace({ statuses, initialApplications })
           <AddApplicationModal onApplicationCreated={handleApplicationCreated} />
         </div>
 
-        <div className="flex items-center border-y border-slate-200 py-3">
+        <div className="flex items-center justify-between gap-3 border-y border-slate-200 py-3">
           <p className="text-sm font-medium text-slate-600 sm:text-base">
-            <span className="font-semibold text-slate-950">{totalJobs}</span>{" "}
-            total jobs
+            <span className="font-semibold text-slate-950">{visibleJobs}</span>{" "}
+            {hasActiveFilters ? "visible jobs" : "total jobs"}
+            {hasActiveFilters ? (
+              <span className="ml-2 text-sm text-slate-500">
+                of {totalJobs} total
+              </span>
+            ) : null}
           </p>
+
+          <button
+            type="button"
+            onClick={openFilterModal}
+            aria-label="Open filters"
+            className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${
+              hasActiveFilters
+                ? "border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
+                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+            }`}
+          >
+            <FilterIcon />
+            {hasActiveFilters ? (
+              <span
+                aria-hidden="true"
+                className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-teal-600"
+              />
+            ) : null}
+          </button>
         </div>
       </div>
 
       {hasNoApplications ? <EmptyApplicationsState /> : null}
+      {hasNoVisibleApplications ? <EmptyFilteredApplicationsState /> : null}
+      {favoriteErrorMessage ? (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {favoriteErrorMessage}
+        </p>
+      ) : null}
 
       <ApplicationsBoard
         statuses={statuses}
-        applications={applications}
+        applications={visibleApplications}
+        emptyColumnMessage={
+          hasActiveFilters ? "No matches" : "No applications yet"
+        }
         onApplicationsChange={handleApplicationsChange}
+        onApplicationFavoriteToggle={handleApplicationFavoriteToggle}
         onApplicationSelect={setSelectedApplication}
       />
 
@@ -1224,6 +1555,16 @@ export default function ApplicationsWorkspace({ statuses, initialApplications })
           onNoteDelete={handleApplicationNoteDelete}
           onNoteUpdate={handleApplicationNoteUpdate}
           onUpdate={handleApplicationUpdate}
+        />
+      ) : null}
+
+      {isFilterModalOpen ? (
+        <ApplicationsFilterModal
+          isOpen={isFilterModalOpen}
+          filters={filters}
+          onClearFilters={handleClearFilters}
+          onClose={closeFilterModal}
+          onSearchApplications={handleSearchApplications}
         />
       ) : null}
     </section>

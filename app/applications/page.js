@@ -58,6 +58,7 @@ export default async function ApplicationsPage() {
       location: true,
       jobType: true,
       status: true,
+      isFavorite: true,
       createdAt: true,
       updatedAt: true,
       notes: {

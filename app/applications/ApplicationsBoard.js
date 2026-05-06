@@ -51,6 +51,25 @@ function LocationIcon() {
   );
 }
 
+function HeartIcon({ isFavorite }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill={isFavorite ? "currentColor" : "none"}
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M20.1 5.9a5.35 5.35 0 0 0-7.57 0L12 6.43l-.53-.53A5.35 5.35 0 1 0 3.9 13.47L12 21.25l8.1-7.78a5.35 5.35 0 0 0 0-7.57Z"
+      />
+    </svg>
+  );
+}
+
 function ApplicationCard({
   application,
   isDragging,
@@ -58,12 +77,21 @@ function ApplicationCard({
   onClick,
   onDragStart,
   onDragEnd,
+  onFavoriteToggle,
 }) {
+  const isFavorite = Boolean(application.isFavorite);
+
   function handleKeyDown(event) {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       onClick(event, application);
     }
+  }
+
+  function handleFavoriteClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    onFavoriteToggle(application, !isFavorite);
   }
 
   return (
@@ -75,18 +103,36 @@ function ApplicationCard({
       onKeyDown={handleKeyDown}
       onDragStart={(event) => onDragStart(event, application.id)}
       onDragEnd={onDragEnd}
-      className={`relative cursor-grab rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md active:cursor-grabbing ${
+      className={`relative cursor-grab rounded-lg border border-slate-200 bg-white p-4 pr-12 shadow-sm transition hover:border-slate-300 hover:shadow-md active:cursor-grabbing ${
         isDragging ? "opacity-50 ring-2 ring-teal-500" : ""
       } ${isPending ? "border-teal-200 bg-teal-50/30" : ""}`}
     >
       {isPending ? (
         <span
           aria-label="Saving status"
-          className="absolute right-3 top-3 h-2 w-2 rounded-full bg-teal-500"
+          className="absolute right-12 top-5 h-2 w-2 rounded-full bg-teal-500"
         />
       ) : null}
 
-      <h3 className="pr-4 text-sm font-semibold leading-5 text-slate-950">
+      <button
+        type="button"
+        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+        aria-pressed={isFavorite}
+        draggable={false}
+        onClick={handleFavoriteClick}
+        onKeyDown={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+        onDragStart={(event) => event.stopPropagation()}
+        className={`absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md transition hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 ${
+          isFavorite
+            ? "text-rose-500 hover:text-rose-600"
+            : "text-slate-400 hover:text-rose-500"
+        }`}
+      >
+        <HeartIcon isFavorite={isFavorite} />
+      </button>
+
+      <h3 className="text-sm font-semibold leading-5 text-slate-950">
         {application.title}
       </h3>
 
@@ -120,7 +166,9 @@ function groupApplicationsByStatus(applications, statuses) {
 export default function ApplicationsBoard({
   statuses,
   applications,
+  emptyColumnMessage = "No applications yet",
   onApplicationsChange,
+  onApplicationFavoriteToggle,
   onApplicationSelect,
 }) {
   const scrollContainerRef = useRef(null);
@@ -525,12 +573,13 @@ export default function ApplicationsBoard({
                         onClick={handleCardClick}
                         onDragStart={handleDragStart}
                         onDragEnd={handleDragEnd}
+                        onFavoriteToggle={onApplicationFavoriteToggle}
                       />
                     ))
                   ) : (
                     <div className="flex min-h-40 w-full flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 text-center">
                       <p className="text-sm text-slate-500">
-                        No applications yet
+                        {emptyColumnMessage}
                       </p>
                     </div>
                   )}

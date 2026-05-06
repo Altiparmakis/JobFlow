@@ -33,6 +33,7 @@ function getApplicationSelect(userId) {
     location: true,
     jobType: true,
     status: true,
+    isFavorite: true,
     createdAt: true,
     updatedAt: true,
     notes: {
@@ -163,6 +164,64 @@ export async function updateJobApplicationStatus(applicationId, status) {
     },
     data: {
       status,
+    },
+  });
+
+  if (result.count === 0) {
+    return {
+      success: false,
+      message: "Application could not be updated.",
+    };
+  }
+
+  const application = await prisma.jobApplication.findFirst({
+    where: {
+      id: applicationId,
+      clerkId: userId,
+    },
+    select: getApplicationSelect(userId),
+  });
+
+  if (!application) {
+    return {
+      success: false,
+      message: "Application could not be loaded after the update.",
+    };
+  }
+
+  revalidatePath("/applications");
+
+  return {
+    success: true,
+    message: "Application updated.",
+    application: serializeApplication(application),
+  };
+}
+
+export async function updateJobApplicationFavorite(applicationId, isFavorite) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return {
+      success: false,
+      message: "You must be signed in to update an application.",
+    };
+  }
+
+  if (!applicationId || typeof isFavorite !== "boolean") {
+    return {
+      success: false,
+      message: "Favorite status could not be updated.",
+    };
+  }
+
+  const result = await prisma.jobApplication.updateMany({
+    where: {
+      id: applicationId,
+      clerkId: userId,
+    },
+    data: {
+      isFavorite,
     },
   });
 
