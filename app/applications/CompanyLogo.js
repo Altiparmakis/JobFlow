@@ -140,7 +140,7 @@ export default function CompanyLogo({ companyName }) {
   const shouldShowLogo = logoUrl && failedLogoUrl !== logoUrl;
 
   return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/80 bg-white/85 text-teal-700 shadow-sm ring-1 ring-slate-950/5">
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/85 text-teal-700 shadow-sm ring-1 ring-slate-950/4">
       {shouldShowLogo ? (
         <img
           src={logoUrl}
@@ -151,7 +151,7 @@ export default function CompanyLogo({ companyName }) {
           decoding="async"
           referrerPolicy="no-referrer"
           onError={() => setFailedLogoUrl(logoUrl)}
-          className="h-full w-full object-contain p-1.5"
+          className="h-full w-full object-contain"
         />
       ) : (
         <GenericCompanyLogo />
