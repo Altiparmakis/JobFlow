@@ -17,3 +17,32 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+.landing-video-fade {
+  --landing-video-top-mask: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.42) 0%,
+    rgba(0, 0, 0, 0.78) 7%,
+    #000 18%,
+    #000 100%
+  );
+  --landing-video-side-mask: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.36) 0%,
+    rgba(0, 0, 0, 0.74) 6%,
+    #000 16%,
+    #000 84%,
+    rgba(0, 0, 0, 0.74) 94%,
+    rgba(0, 0, 0, 0.36) 100%
+  );
+
+  -webkit-mask-image: var(--landing-video-top-mask),
+    var(--landing-video-side-mask);
+  mask-image: var(--landing-video-top-mask), var(--landing-video-side-mask);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}

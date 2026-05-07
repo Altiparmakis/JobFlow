@@ -2,11 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { celebrateAcceptedApplication } from "@/lib/confetti";
+import CompanyLogo from "./CompanyLogo";
 import { updateJobApplicationStatus } from "./actions";
 
 const AUTO_SCROLL_EDGE_SIZE = 96;
 const AUTO_SCROLL_MAX_SPEED = 24;
 const ACCEPTED_STATUS = "ACCEPTED";
+
+const cardStylesByStatus = {
+  SAVED: "border-slate-200 bg-white hover:border-slate-300",
+  APPLIED: "border-teal-100 bg-teal-50/50 hover:border-teal-200",
+  SCREEN: "border-teal-200 bg-teal-50 hover:border-teal-300",
+  INTERVIEWING: "border-teal-300 bg-teal-100/70 hover:border-teal-400",
+  OFFER: "border-emerald-300 bg-emerald-100/75 hover:border-emerald-400",
+  ACCEPTED: "border-emerald-400 bg-emerald-200/75 hover:border-emerald-500",
+  REJECTED: "border-rose-200 bg-rose-50/90 hover:border-rose-300",
+};
 
 function BuildingIcon() {
   return (
@@ -80,6 +91,8 @@ function ApplicationCard({
   onFavoriteToggle,
 }) {
   const isFavorite = Boolean(application.isFavorite);
+  const cardStyle =
+    cardStylesByStatus[application.status] ?? cardStylesByStatus.SAVED;
 
   function handleKeyDown(event) {
     if (event.key === "Enter" || event.key === " ") {
@@ -103,9 +116,9 @@ function ApplicationCard({
       onKeyDown={handleKeyDown}
       onDragStart={(event) => onDragStart(event, application.id)}
       onDragEnd={onDragEnd}
-      className={`relative cursor-grab rounded-lg border border-slate-200 bg-white p-4 pr-12 shadow-sm transition hover:border-slate-300 hover:shadow-md active:cursor-grabbing ${
+      className={`relative cursor-grab rounded-lg border p-4 shadow-sm transition hover:shadow-md active:cursor-grabbing ${cardStyle} ${
         isDragging ? "opacity-50 ring-2 ring-teal-500" : ""
-      } ${isPending ? "border-teal-200 bg-teal-50/30" : ""}`}
+      } ${isPending ? "ring-1 ring-inset ring-teal-300" : ""}`}
     >
       {isPending ? (
         <span
@@ -132,22 +145,28 @@ function ApplicationCard({
         <HeartIcon isFavorite={isFavorite} />
       </button>
 
-      <h3 className="text-sm font-semibold leading-5 text-slate-950">
-        {application.title}
-      </h3>
+      <div className="min-w-0 pr-10">
+        <h3 className="text-sm font-semibold leading-5 text-slate-950">
+          {application.title}
+        </h3>
+      </div>
 
-      <div className="mt-3 space-y-2">
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          <BuildingIcon />
-          <span className="min-w-0 truncate">{application.companyName}</span>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <BuildingIcon />
+            <span className="min-w-0 truncate">{application.companyName}</span>
+          </div>
+
+          {application.location ? (
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <LocationIcon />
+              <span className="min-w-0 truncate">{application.location}</span>
+            </div>
+          ) : null}
         </div>
 
-        {application.location ? (
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <LocationIcon />
-            <span className="min-w-0 truncate">{application.location}</span>
-          </div>
-        ) : null}
+        <CompanyLogo companyName={application.companyName} />
       </div>
     </article>
   );
@@ -531,64 +550,74 @@ export default function ApplicationsBoard({
         </p>
       ) : null}
 
-      <div
-        ref={scrollContainerRef}
-        onDragOver={handleBoardDragOver}
-        className="overflow-x-auto pb-4"
-      >
-        <div className="grid min-w-[1840px] grid-cols-7 gap-2">
-          {statuses.map((status) => {
-            const statusApplications = applicationsByStatus[status.value];
-            const isActiveDropTarget = activeDropStatus === status.value;
-
-            return (
-              <section
-                key={status.value}
-                onDragOver={(event) => event.preventDefault()}
-                onDragEnter={() => setActiveDropStatus(status.value)}
-                onDrop={(event) => handleDrop(event, status.value)}
-                className={`flex min-h-[32rem] flex-col rounded-xl border bg-white shadow-sm transition ${
-                  isActiveDropTarget
-                    ? "border-teal-300 ring-2 ring-teal-100"
-                    : "border-slate-200"
-                }`}
-              >
-                <div className="border-b border-slate-200 px-4 py-3">
-                  <h2 className="text-sm font-semibold text-slate-950">
-                    {status.label}{" "}
-                    <span className="font-medium text-slate-500">
-                      ({statusApplications.length})
-                    </span>
-                  </h2>
-                </div>
-
-                <div className="flex flex-1 flex-col gap-3 p-4">
-                  {statusApplications.length > 0 ? (
-                    statusApplications.map((application) => (
-                      <ApplicationCard
-                        key={application.id}
-                        application={application}
-                        isDragging={draggingId === application.id}
-                        isPending={Boolean(pendingApplicationIds[application.id])}
-                        onClick={handleCardClick}
-                        onDragStart={handleDragStart}
-                        onDragEnd={handleDragEnd}
-                        onFavoriteToggle={onApplicationFavoriteToggle}
-                      />
-                    ))
-                  ) : (
-                    <div className="flex min-h-40 w-full flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 text-center">
-                      <p className="text-sm text-slate-500">
-                        {emptyColumnMessage}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </section>
-            );
-          })}
+      {statuses.length === 0 ? (
+        <div className="flex min-h-[24rem] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-4 text-center shadow-sm">
+          <p className="text-sm font-medium text-slate-500">
+            No columns selected.
+          </p>
         </div>
-      </div>
+      ) : (
+        <div
+          ref={scrollContainerRef}
+          onDragOver={handleBoardDragOver}
+          className="overflow-x-auto pb-4"
+        >
+          <div className="grid grid-flow-col auto-cols-[minmax(16rem,1fr)] gap-2">
+            {statuses.map((status) => {
+              const statusApplications = applicationsByStatus[status.value];
+              const isActiveDropTarget = activeDropStatus === status.value;
+
+              return (
+                <section
+                  key={status.value}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDragEnter={() => setActiveDropStatus(status.value)}
+                  onDrop={(event) => handleDrop(event, status.value)}
+                  className={`flex min-h-[32rem] flex-col rounded-xl border bg-white shadow-sm transition ${
+                    isActiveDropTarget
+                      ? "border-teal-300 ring-2 ring-teal-100"
+                      : "border-slate-200"
+                  }`}
+                >
+                  <div className="border-b border-slate-200 px-4 py-3">
+                    <h2 className="text-sm font-semibold text-slate-950">
+                      {status.label}{" "}
+                      <span className="font-medium text-slate-500">
+                        ({statusApplications.length})
+                      </span>
+                    </h2>
+                  </div>
+
+                  <div className="flex flex-1 flex-col gap-3 p-4">
+                    {statusApplications.length > 0 ? (
+                      statusApplications.map((application) => (
+                        <ApplicationCard
+                          key={application.id}
+                          application={application}
+                          isDragging={draggingId === application.id}
+                          isPending={Boolean(
+                            pendingApplicationIds[application.id],
+                          )}
+                          onClick={handleCardClick}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                          onFavoriteToggle={onApplicationFavoriteToggle}
+                        />
+                      ))
+                    ) : (
+                      <div className="flex min-h-40 w-full flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 text-center">
+                        <p className="text-sm text-slate-500">
+                          {emptyColumnMessage}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

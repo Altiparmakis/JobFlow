@@ -9,8 +9,8 @@ const statuses = [
   { label: "Screen", value: "SCREEN" },
   { label: "Interviewing", value: "INTERVIEWING" },
   { label: "Offer", value: "OFFER" },
-  { label: "Rejected", value: "REJECTED" },
   { label: "Accepted", value: "ACCEPTED" },
+  { label: "Rejected", value: "REJECTED" },
 ];
 
 const noteSelect = {

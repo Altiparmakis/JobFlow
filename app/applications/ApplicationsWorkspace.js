@@ -17,6 +17,7 @@ import ApplicationsFilterModal, {
   getNormalizedApplicationFilters,
 } from "./ApplicationsFilterModal";
 import ApplicationsBoard from "./ApplicationsBoard";
+import VisibleColumnsModal from "./VisibleColumnsModal";
 
 const ACCEPTED_STATUS = "ACCEPTED";
 
@@ -153,6 +154,30 @@ function FilterIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M4.75 6.75h14.5M7.75 12h8.5M10.25 17.25h3.5"
+      />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M2.75 12s3.5-6.25 9.25-6.25S21.25 12 21.25 12s-3.5 6.25-9.25 6.25S2.75 12 2.75 12Z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 14.75a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5Z"
       />
     </svg>
   );
@@ -1203,14 +1228,25 @@ export default function ApplicationsWorkspace({ statuses, initialApplications })
     ...APPLICATION_FILTER_DEFAULTS,
   });
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [isVisibleColumnsModalOpen, setIsVisibleColumnsModalOpen] =
+    useState(false);
+  const [visibleStatusValues, setVisibleStatusValues] = useState(() =>
+    statuses.map((status) => status.value),
+  );
   const [favoriteErrorMessage, setFavoriteErrorMessage] = useState("");
   const visibleApplications = useMemo(
     () => getVisibleApplications(applications, filters),
     [applications, filters],
   );
+  const visibleBoardStatuses = useMemo(() => {
+    const visibleStatusSet = new Set(visibleStatusValues);
+
+    return statuses.filter((status) => visibleStatusSet.has(status.value));
+  }, [statuses, visibleStatusValues]);
   const totalJobs = applications.length;
   const visibleJobs = visibleApplications.length;
   const hasActiveFilters = hasActiveFilterOptions(filters);
+  const hasHiddenColumns = visibleBoardStatuses.length < statuses.length;
   const hasNoApplications = totalJobs === 0;
   const hasNoVisibleApplications =
     totalJobs > 0 && visibleJobs === 0 && hasActiveFilters;
@@ -1350,6 +1386,24 @@ export default function ApplicationsWorkspace({ statuses, initialApplications })
 
   function closeFilterModal() {
     setIsFilterModalOpen(false);
+  }
+
+  function openVisibleColumnsModal() {
+    setIsVisibleColumnsModalOpen(true);
+  }
+
+  function closeVisibleColumnsModal() {
+    setIsVisibleColumnsModalOpen(false);
+  }
+
+  function handleVisibleStatusToggle(statusValue) {
+    setVisibleStatusValues((currentValues) => {
+      if (currentValues.includes(statusValue)) {
+        return currentValues.filter((value) => value !== statusValue);
+      }
+
+      return [...currentValues, statusValue];
+    });
   }
 
   function handleClearFilters(
@@ -1504,24 +1558,45 @@ export default function ApplicationsWorkspace({ statuses, initialApplications })
             ) : null}
           </p>
 
-          <button
-            type="button"
-            onClick={openFilterModal}
-            aria-label="Open filters"
-            className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${
-              hasActiveFilters
-                ? "border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
-                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
-            }`}
-          >
-            <FilterIcon />
-            {hasActiveFilters ? (
-              <span
-                aria-hidden="true"
-                className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-teal-600"
-              />
-            ) : null}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={openVisibleColumnsModal}
+              aria-label="Manage visible columns"
+              className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${
+                hasHiddenColumns
+                  ? "border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
+                  : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+              }`}
+            >
+              <EyeIcon />
+              {hasHiddenColumns ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-teal-600"
+                />
+              ) : null}
+            </button>
+
+            <button
+              type="button"
+              onClick={openFilterModal}
+              aria-label="Open filters"
+              className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${
+                hasActiveFilters
+                  ? "border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
+                  : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+              }`}
+            >
+              <FilterIcon />
+              {hasActiveFilters ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-teal-600"
+                />
+              ) : null}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1534,7 +1609,7 @@ export default function ApplicationsWorkspace({ statuses, initialApplications })
       ) : null}
 
       <ApplicationsBoard
-        statuses={statuses}
+        statuses={visibleBoardStatuses}
         applications={visibleApplications}
         emptyColumnMessage={
           hasActiveFilters ? "No matches" : "No applications yet"
@@ -1567,6 +1642,14 @@ export default function ApplicationsWorkspace({ statuses, initialApplications })
           onSearchApplications={handleSearchApplications}
         />
       ) : null}
+
+      <VisibleColumnsModal
+        isOpen={isVisibleColumnsModalOpen}
+        statuses={statuses}
+        visibleStatuses={visibleStatusValues}
+        onClose={closeVisibleColumnsModal}
+        onToggleStatus={handleVisibleStatusToggle}
+      />
     </section>
   );
 }
