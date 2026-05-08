@@ -10,12 +10,22 @@ import {
   serializeApplication,
   serializeNote,
 } from "@/lib/application-records";
+import {
+  extractJobDetailsFromJobUrl,
+  normalizeJobPostingUrl,
+} from "@/lib/job-url-extraction";
 import prisma from "@/lib/prisma";
 
 const noteContentMaxLength = 4000;
 
 function getString(formData, name) {
   const value = formData.get(name);
+
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getDraftString(draft, name) {
+  const value = draft?.[name];
 
   return typeof value === "string" ? value.trim() : "";
 }
@@ -71,6 +81,88 @@ export async function createJobApplication(formData) {
   return {
     success: true,
     message: "Application saved.",
+    application: serializeApplication(application),
+  };
+}
+
+export async function extractJobApplicationFromUrl(url) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return {
+      success: false,
+      message: "You must be signed in to extract job details.",
+    };
+  }
+
+  return extractJobDetailsFromJobUrl(url);
+}
+
+export async function importExtractedJobApplication(applicationDraft) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return {
+      success: false,
+      message: "You must be signed in to import an application.",
+    };
+  }
+
+  const title = getDraftString(applicationDraft, "title");
+  const companyName = getDraftString(applicationDraft, "companyName");
+  const description = getDraftString(applicationDraft, "description");
+  const location = getDraftString(applicationDraft, "location");
+  const url = getDraftString(applicationDraft, "url");
+  const jobType = getDraftString(applicationDraft, "jobType");
+  const status = getDraftString(applicationDraft, "status");
+
+  if (!title || !companyName || !jobType || !status) {
+    return {
+      success: false,
+      message: "Please fill in all required fields before importing.",
+    };
+  }
+
+  if (!JOB_TYPE_SET.has(jobType) || !APPLICATION_STATUS_SET.has(status)) {
+    return {
+      success: false,
+      message: "Please choose valid job type and status values.",
+    };
+  }
+
+  const normalizedUrl = url
+    ? normalizeJobPostingUrl(url)
+    : {
+        success: true,
+        url: "",
+      };
+
+  if (url && !normalizedUrl.success) {
+    return {
+      success: false,
+      message: normalizedUrl.message || "Please enter a valid job URL.",
+    };
+  }
+
+  const application = await prisma.jobApplication.create({
+    data: {
+      clerkId: userId,
+      title,
+      companyName,
+      description: description || null,
+      url: normalizedUrl.url || null,
+      location: location || null,
+      jobType,
+      status,
+    },
+    select: getApplicationSelect(userId),
+  });
+
+  revalidatePath("/applications");
+
+  return {
+    success: true,
+    message: "Application imported.",
     application: serializeApplication(application),
   };
 }
