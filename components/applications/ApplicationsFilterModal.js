@@ -1,69 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-export const APPLICATION_FILTER_DEFAULTS = {
-  orderBy: "updatedAt",
-  appliedFrom: "",
-  appliedUntil: "",
-  roleFilter: "",
-  favoritesOnly: false,
-  statusFilter: "",
-};
-
-export const APPLICATION_ORDER_BY_OPTIONS = [
-  { label: "Tracked date", value: "updatedAt" },
-  { label: "Title", value: "title" },
-  { label: "Created date", value: "createdAt" },
-];
-
-const APPLICATION_ROLE_OPTIONS = [
-  { label: "All roles", value: "" },
-  { label: "Full-time", value: "FULL_TIME" },
-  { label: "Part-time", value: "PART_TIME" },
-  { label: "Internship", value: "INTERNSHIP" },
-];
-
-const APPLICATION_STATUS_OPTIONS = [
-  { label: "All statuses", value: "" },
-  { label: "Saved", value: "SAVED" },
-  { label: "Applied", value: "APPLIED" },
-  { label: "Screen", value: "SCREEN" },
-  { label: "Interviewing", value: "INTERVIEWING" },
-  { label: "Offer", value: "OFFER" },
-  { label: "Accepted", value: "ACCEPTED" },
-  { label: "Rejected", value: "REJECTED" },
-];
+import {
+  APPLICATION_FILTER_DEFAULTS,
+  APPLICATION_ORDER_BY_OPTIONS,
+} from "@/constants/applicationFilters";
+import { APPLICATION_STATUS_FILTER_OPTIONS } from "@/constants/applicationStatuses";
+import { JOB_TYPE_FILTER_OPTIONS } from "@/constants/jobTypes";
+import { getNormalizedApplicationFilters } from "@/lib/application-utils";
 
 const inputClassName =
   "mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500";
-
-export function getNormalizedApplicationFilters(filters) {
-  const orderBy = APPLICATION_ORDER_BY_OPTIONS.some(
-    (option) => option.value === filters?.orderBy,
-  )
-    ? filters.orderBy
-    : APPLICATION_FILTER_DEFAULTS.orderBy;
-  const roleFilter = APPLICATION_ROLE_OPTIONS.some(
-    (option) => option.value === filters?.roleFilter,
-  )
-    ? filters.roleFilter
-    : APPLICATION_FILTER_DEFAULTS.roleFilter;
-  const statusFilter = APPLICATION_STATUS_OPTIONS.some(
-    (option) => option.value === filters?.statusFilter,
-  )
-    ? filters.statusFilter
-    : APPLICATION_FILTER_DEFAULTS.statusFilter;
-
-  return {
-    ...APPLICATION_FILTER_DEFAULTS,
-    ...(filters ?? {}),
-    orderBy,
-    roleFilter,
-    favoritesOnly: Boolean(filters?.favoritesOnly),
-    statusFilter,
-  };
-}
 
 export default function ApplicationsFilterModal({
   isOpen,
@@ -207,7 +154,7 @@ export default function ApplicationsFilterModal({
                 onChange={handleFieldChange}
                 className={inputClassName}
               >
-                {APPLICATION_ROLE_OPTIONS.map((option) => (
+                {JOB_TYPE_FILTER_OPTIONS.map((option) => (
                   <option
                     key={option.value || "all-roles"}
                     value={option.value}
@@ -226,7 +173,7 @@ export default function ApplicationsFilterModal({
                 onChange={handleFieldChange}
                 className={inputClassName}
               >
-                {APPLICATION_STATUS_OPTIONS.map((option) => (
+                {APPLICATION_STATUS_FILTER_OPTIONS.map((option) => (
                   <option
                     key={option.value || "all-statuses"}
                     value={option.value}

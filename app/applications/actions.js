@@ -2,82 +2,17 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { APPLICATION_STATUS_SET } from "@/constants/applicationStatuses";
+import { JOB_TYPE_SET } from "@/constants/jobTypes";
+import {
+  NOTE_SELECT,
+  getApplicationSelect,
+  serializeApplication,
+  serializeNote,
+} from "@/lib/application-records";
 import prisma from "@/lib/prisma";
 
-const jobTypes = new Set(["INTERNSHIP", "FULL_TIME", "PART_TIME"]);
-const statuses = new Set([
-  "SAVED",
-  "APPLIED",
-  "SCREEN",
-  "INTERVIEWING",
-  "OFFER",
-  "REJECTED",
-  "ACCEPTED",
-]);
-
-const noteSelect = {
-  id: true,
-  applicationId: true,
-  content: true,
-  createdAt: true,
-  updatedAt: true,
-};
-
-function getApplicationSelect(userId) {
-  return {
-    id: true,
-    title: true,
-    companyName: true,
-    description: true,
-    url: true,
-    location: true,
-    jobType: true,
-    status: true,
-    isFavorite: true,
-    createdAt: true,
-    updatedAt: true,
-    notes: {
-      where: {
-        clerkId: userId,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      select: noteSelect,
-    },
-  };
-}
-
-function serializeNote(note) {
-  return {
-    ...note,
-    createdAt: note.createdAt.toISOString(),
-    updatedAt: note.updatedAt.toISOString(),
-  };
-}
-
-function serializeApplication(application) {
-  const notes = Array.isArray(application.notes)
-    ? application.notes.map(serializeNote)
-    : application.notes;
-
-  return {
-    ...application,
-    notes,
-    createdAt: application.createdAt.toISOString(),
-    updatedAt: application.updatedAt.toISOString(),
-  };
-}
-
 const noteContentMaxLength = 4000;
-
-const applicationNoteSelect = {
-  id: true,
-  applicationId: true,
-  content: true,
-  createdAt: true,
-  updatedAt: true,
-};
 
 function getString(formData, name) {
   const value = formData.get(name);
@@ -110,7 +45,7 @@ export async function createJobApplication(formData) {
     };
   }
 
-  if (!jobTypes.has(jobType) || !statuses.has(status)) {
+  if (!JOB_TYPE_SET.has(jobType) || !APPLICATION_STATUS_SET.has(status)) {
     return {
       success: false,
       message: "Please choose valid job type and status values.",
@@ -150,7 +85,7 @@ export async function updateJobApplicationStatus(applicationId, status) {
     };
   }
 
-  if (!applicationId || !statuses.has(status)) {
+  if (!applicationId || !APPLICATION_STATUS_SET.has(status)) {
     return {
       success: false,
       message: "Please choose a valid status.",
@@ -288,7 +223,7 @@ export async function updateJobApplication(applicationId, formData) {
     };
   }
 
-  if (!jobTypes.has(jobType) || !statuses.has(status)) {
+  if (!JOB_TYPE_SET.has(jobType) || !APPLICATION_STATUS_SET.has(status)) {
     return {
       success: false,
       message: "Please choose valid job type and status values.",
@@ -391,7 +326,7 @@ export async function createApplicationNote(applicationId, content) {
       clerkId: userId,
       content: noteContent,
     },
-    select: applicationNoteSelect,
+    select: NOTE_SELECT,
   });
 
   revalidatePath("/applications");
@@ -456,7 +391,7 @@ export async function updateApplicationNote(noteId, content) {
     data: {
       content: noteContent,
     },
-    select: applicationNoteSelect,
+    select: NOTE_SELECT,
   });
 
   revalidatePath("/applications");

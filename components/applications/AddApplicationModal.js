@@ -2,23 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { createJobApplication } from "./actions";
-
-const jobTypeOptions = [
-  { label: "Internship", value: "INTERNSHIP" },
-  { label: "Full-time", value: "FULL_TIME" },
-  { label: "Part-time", value: "PART_TIME" },
-];
-
-const statusOptions = [
-  { label: "Saved", value: "SAVED" },
-  { label: "Applied", value: "APPLIED" },
-  { label: "Screen", value: "SCREEN" },
-  { label: "Interviewing", value: "INTERVIEWING" },
-  { label: "Offer", value: "OFFER" },
-  { label: "Accepted", value: "ACCEPTED" },
-  { label: "Rejected", value: "REJECTED" },
-];
+import { createJobApplication } from "@/app/applications/actions";
+import { APPLICATION_STATUS_OPTIONS } from "@/constants/applicationStatuses";
+import { JOB_TYPE_OPTIONS } from "@/constants/jobTypes";
 
 const inputClassName =
   "mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100";
@@ -173,7 +159,7 @@ export default function AddApplicationModal({ onApplicationCreated }) {
                     defaultValue="FULL_TIME"
                     className={inputClassName}
                   >
-                    {jobTypeOptions.map((option) => (
+                    {JOB_TYPE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
@@ -189,7 +175,7 @@ export default function AddApplicationModal({ onApplicationCreated }) {
                     defaultValue="APPLIED"
                     className={inputClassName}
                   >
-                    {statusOptions.map((option) => (
+                    {APPLICATION_STATUS_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
