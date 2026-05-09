@@ -7,6 +7,7 @@ import {
   extractJobApplicationFromUrl,
   importExtractedJobApplication,
 } from "@/app/applications/actions";
+import CVFileUpload from "@/components/applications/CVFileUpload";
 import {
   APPLICATION_STATUS,
   APPLICATION_STATUS_OPTIONS,
@@ -84,6 +85,11 @@ function ManualApplicationForm({
   isSubmitting,
   message,
   onClose,
+  cvFile,
+  cvFileError,
+  onCvFileErrorChange,
+  onCvFileRemove,
+  onCvFileSelect,
   onSubmit,
 }) {
   return (
@@ -179,6 +185,16 @@ function ManualApplicationForm({
           </label>
         </div>
 
+        <CVFileUpload
+          id="add-application-cv"
+          selectedFile={cvFile}
+          errorMessage={cvFileError}
+          disabled={!isActive || isSubmitting}
+          onFileSelect={onCvFileSelect}
+          onFileRemove={onCvFileRemove}
+          onErrorChange={onCvFileErrorChange}
+        />
+
         {message ? (
           <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             {message}
@@ -206,7 +222,16 @@ function ManualApplicationForm({
   );
 }
 
-function ExtractedApplicationPreview({ application, onChange }) {
+function ExtractedApplicationPreview({
+  application,
+  cvFile,
+  cvFileError,
+  isCvFileDisabled = false,
+  onChange,
+  onCvFileErrorChange,
+  onCvFileRemove,
+  onCvFileSelect,
+}) {
   function handleFieldChange(event) {
     const { name, value } = event.target;
 
@@ -302,6 +327,18 @@ function ExtractedApplicationPreview({ application, onChange }) {
         </label>
       </div>
 
+      <div className="mt-4">
+        <CVFileUpload
+          id="import-application-cv"
+          selectedFile={cvFile}
+          errorMessage={cvFileError}
+          disabled={isCvFileDisabled}
+          onFileSelect={onCvFileSelect}
+          onFileRemove={onCvFileRemove}
+          onErrorChange={onCvFileErrorChange}
+        />
+      </div>
+
       <label className={`${labelClassName} mt-4 block`}>
         Description
         <textarea
@@ -338,6 +375,8 @@ function ViaUrlForm({
   const [extractedApplication, setExtractedApplication] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState("");
+  const [cvFile, setCvFile] = useState(null);
+  const [cvFileError, setCvFileError] = useState("");
   const isExtracting = extractionStatus === URL_EXTRACTION_STATUS.LOADING;
 
   function resetExtractionState() {
@@ -345,6 +384,8 @@ function ViaUrlForm({
     setExtractionMessage("");
     setExtractedApplication(null);
     setImportError("");
+    setCvFile(null);
+    setCvFileError("");
   }
 
   function handleUrlChange(event) {
@@ -411,6 +452,11 @@ function ViaUrlForm({
       return;
     }
 
+    if (cvFileError) {
+      setImportError(cvFileError);
+      return;
+    }
+
     const requiredValues = [
       extractedApplication.title,
       extractedApplication.companyName,
@@ -428,7 +474,17 @@ function ViaUrlForm({
     onPendingChange(true);
 
     try {
-      const result = await importExtractedJobApplication(extractedApplication);
+      const formData = new FormData();
+
+      Object.entries(extractedApplication).forEach(([key, value]) => {
+        formData.append(key, value ?? "");
+      });
+
+      if (cvFile) {
+        formData.append("cvFile", cvFile);
+      }
+
+      const result = await importExtractedJobApplication(formData);
 
       if (result.success) {
         onApplicationImported(result.application);
@@ -469,7 +525,16 @@ function ViaUrlForm({
         extractedApplication ? (
           <ExtractedApplicationPreview
             application={extractedApplication}
+            cvFile={cvFile}
+            cvFileError={cvFileError}
+            isCvFileDisabled={isImporting}
             onChange={handleExtractedFieldChange}
+            onCvFileErrorChange={setCvFileError}
+            onCvFileRemove={() => setCvFile(null)}
+            onCvFileSelect={(file) => {
+              setCvFile(file);
+              setImportError("");
+            }}
           />
         ) : null}
 
@@ -536,10 +601,18 @@ export default function AddApplicationModal({ onApplicationCreated }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUrlActionPending, setIsUrlActionPending] = useState(false);
   const [message, setMessage] = useState("");
+  const [cvFile, setCvFile] = useState(null);
+  const [cvFileError, setCvFileError] = useState("");
+
+  function resetCvFile() {
+    setCvFile(null);
+    setCvFileError("");
+  }
 
   function openModal() {
     setSelectedMode(APPLICATION_ADD_MODES.MANUAL);
     setMessage("");
+    resetCvFile();
     setIsOpen(true);
   }
 
@@ -548,6 +621,7 @@ export default function AddApplicationModal({ onApplicationCreated }) {
       setIsOpen(false);
       setSelectedMode(APPLICATION_ADD_MODES.MANUAL);
       setMessage("");
+      resetCvFile();
     }
   }
 
@@ -555,6 +629,7 @@ export default function AddApplicationModal({ onApplicationCreated }) {
     setIsOpen(false);
     setSelectedMode(APPLICATION_ADD_MODES.MANUAL);
     setMessage("");
+    resetCvFile();
     onApplicationCreated?.(application);
     router.refresh();
   }
@@ -565,10 +640,29 @@ export default function AddApplicationModal({ onApplicationCreated }) {
     const form = event.currentTarget;
     const formData = new FormData(form);
 
+    if (cvFileError) {
+      setMessage(cvFileError);
+      return;
+    }
+
+    formData.delete("cvFile");
+
+    if (cvFile) {
+      formData.append("cvFile", cvFile);
+    }
+
     setIsSubmitting(true);
     setMessage("");
 
-    const result = await createJobApplication(formData);
+    let result;
+
+    try {
+      result = await createJobApplication(formData);
+    } catch {
+      setIsSubmitting(false);
+      setMessage("Application could not be saved. Please try again.");
+      return;
+    }
 
     setIsSubmitting(false);
 
@@ -576,12 +670,13 @@ export default function AddApplicationModal({ onApplicationCreated }) {
       form.reset();
       setIsOpen(false);
       setSelectedMode(APPLICATION_ADD_MODES.MANUAL);
+      resetCvFile();
       onApplicationCreated?.(result.application);
       router.refresh();
       return;
     }
 
-    setMessage(result.message);
+    setMessage(result.message || "Application could not be saved.");
   }
 
   return (
@@ -639,7 +734,7 @@ export default function AddApplicationModal({ onApplicationCreated }) {
                 aria-hidden={selectedMode !== APPLICATION_ADD_MODES.MANUAL}
                 className={`overflow-hidden transition-all duration-300 ease-out ${
                   selectedMode === APPLICATION_ADD_MODES.MANUAL
-                    ? "max-h-[52rem] translate-x-0 opacity-100"
+                    ? "max-h-[72rem] translate-x-0 opacity-100"
                     : "max-h-0 -translate-x-6 opacity-0"
                 }`}
               >
@@ -648,6 +743,14 @@ export default function AddApplicationModal({ onApplicationCreated }) {
                   isSubmitting={isSubmitting}
                   message={message}
                   onClose={closeModal}
+                  cvFile={cvFile}
+                  cvFileError={cvFileError}
+                  onCvFileErrorChange={setCvFileError}
+                  onCvFileRemove={() => setCvFile(null)}
+                  onCvFileSelect={(file) => {
+                    setCvFile(file);
+                    setMessage("");
+                  }}
                   onSubmit={handleSubmit}
                 />
               </div>
@@ -656,7 +759,7 @@ export default function AddApplicationModal({ onApplicationCreated }) {
                 aria-hidden={selectedMode !== APPLICATION_ADD_MODES.URL}
                 className={`overflow-hidden transition-all duration-300 ease-out ${
                   selectedMode === APPLICATION_ADD_MODES.URL
-                    ? "max-h-[52rem] translate-x-0 opacity-100"
+                    ? "max-h-[72rem] translate-x-0 opacity-100"
                     : "max-h-0 translate-x-6 opacity-0"
                 }`}
               >

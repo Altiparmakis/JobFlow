@@ -66,3 +66,5 @@ Thumbs.db
 
 AGENTS.md
 CLAUDE.md
+.vercel
+.env*.local

@@ -20,6 +20,7 @@ Users can save job opportunities, track their progress through different applica
 - Confetti celebration when an application is accepted
 - Notes / activity history for each application
 - Edit and delete notes
+- Optional private CV / resume attachment per application
 - Application details modal
 - Responsive and modern UI
 - Total jobs counter
@@ -49,7 +50,15 @@ Applications can be tracked through the following stages:
 - Neon PostgreSQL
 - Vercel
 - canvas-confetti
+- Vercel Blob
 - pnpm
+
+## File Uploads
+
+CV / resume uploads use Vercel Blob private storage. Add `BLOB_READ_WRITE_TOKEN`
+to `.env.local` for local development and to the Vercel project environment
+variables for production. The database stores only Blob metadata and the Blob
+URL, not the raw PDF/DOC/DOCX file.
 
 ## Project Structure
 

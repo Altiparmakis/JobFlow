@@ -18,6 +18,10 @@ model JobApplication {
   jobType     JobType
   status      ApplicationStatus @default(SAVED)
   isFavorite  Boolean           @default(false)
+  cvFileUrl   String?
+  cvFileName  String?
+  cvFileType  String?
+  cvFileSize  Int?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   notes       ApplicationNote[]

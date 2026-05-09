@@ -4,11 +4,11 @@
 import { useMemo, useState } from "react";
 import { getLogoUrl } from "@/lib/logo-utils";
 
-function GenericCompanyLogo() {
+function GenericCompanyLogo({ className = "h-5 w-5" }) {
   return (
     <svg
       aria-hidden="true"
-      className="h-5 w-5 text-teal-700"
+      className={`${className} text-teal-700`}
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -23,22 +23,27 @@ function GenericCompanyLogo() {
   );
 }
 
-export default function CompanyLogo({ companyName }) {
+export default function CompanyLogo({ companyName, size = "md" }) {
   const [failedLogoUrl, setFailedLogoUrl] = useState("");
   const logoUrl = useMemo(() => getLogoUrl(companyName), [companyName]);
   const logoAlt = companyName?.trim()
     ? `${companyName.trim()} logo`
     : "Company logo";
   const shouldShowLogo = logoUrl && failedLogoUrl !== logoUrl;
+  const logoSizeClassName = size === "lg" ? "h-10 w-10" : "h-9 w-9";
+  const fallbackIconSizeClassName = size === "lg" ? "h-6 w-6" : "h-5 w-5";
+  const imageSize = size === "lg" ? 40 : 40;
 
   return (
-    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden  rounded-lg bg-white/85 text-teal-700 shadow-sm ring-1 ring-slate-950/4">
+    <div
+      className={`flex ${logoSizeClassName} shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/85 text-teal-700 shadow-sm ring-1 ring-slate-950/4`}
+    >
       {shouldShowLogo ? (
         <img
           src={logoUrl}
           alt={logoAlt}
-          width={40}
-          height={40}
+          width={imageSize}
+          height={imageSize}
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
@@ -46,7 +51,7 @@ export default function CompanyLogo({ companyName }) {
           className="h-full w-full object-contain"
         />
       ) : (
-        <GenericCompanyLogo />
+        <GenericCompanyLogo className={fallbackIconSizeClassName} />
       )}
     </div>
   );

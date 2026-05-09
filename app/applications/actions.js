@@ -11,6 +11,12 @@ import {
   serializeNote,
 } from "@/lib/application-records";
 import {
+  deleteCvFile,
+  getCvFileFromFormData,
+  shouldRemoveCvFile,
+  uploadCvFile,
+} from "@/lib/cv-file-storage";
+import {
   extractJobDetailsFromJobUrl,
   normalizeJobPostingUrl,
 } from "@/lib/job-url-extraction";
@@ -28,6 +34,47 @@ function getDraftString(draft, name) {
   const value = draft?.[name];
 
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getPayloadString(payload, name) {
+  return typeof payload?.get === "function"
+    ? getString(payload, name)
+    : getDraftString(payload, name);
+}
+
+async function uploadOptionalCvFile(formData, userId) {
+  if (typeof formData?.get !== "function") {
+    return {
+      success: true,
+      metadata: {},
+    };
+  }
+
+  const cvFile = getCvFileFromFormData(formData);
+
+  if (!cvFile) {
+    return {
+      success: true,
+      metadata: {},
+    };
+  }
+
+  return uploadCvFile({
+    file: cvFile,
+    userId,
+  });
+}
+
+async function deleteCvFileQuietly(cvFileUrl) {
+  if (!cvFileUrl) {
+    return;
+  }
+
+  const result = await deleteCvFile(cvFileUrl);
+
+  if (!result.success) {
+    console.error(result.message);
+  }
 }
 
 export async function createJobApplication(formData) {
@@ -62,19 +109,41 @@ export async function createJobApplication(formData) {
     };
   }
 
-  const application = await prisma.jobApplication.create({
-    data: {
-      clerkId: userId,
-      title,
-      companyName,
-      description: description || null,
-      url: url || null,
-      location: location || null,
-      jobType,
-      status,
-    },
-    select: getApplicationSelect(userId),
-  });
+  const cvUpload = await uploadOptionalCvFile(formData, userId);
+
+  if (!cvUpload.success) {
+    return {
+      success: false,
+      message: cvUpload.message,
+    };
+  }
+
+  let application;
+
+  try {
+    application = await prisma.jobApplication.create({
+      data: {
+        clerkId: userId,
+        title,
+        companyName,
+        description: description || null,
+        url: url || null,
+        location: location || null,
+        jobType,
+        status,
+        ...cvUpload.metadata,
+      },
+      select: getApplicationSelect(userId),
+    });
+  } catch (error) {
+    await deleteCvFileQuietly(cvUpload.metadata?.cvFileUrl);
+    console.error("Application creation failed:", error);
+
+    return {
+      success: false,
+      message: "Application could not be saved.",
+    };
+  }
 
   revalidatePath("/applications");
 
@@ -108,13 +177,13 @@ export async function importExtractedJobApplication(applicationDraft) {
     };
   }
 
-  const title = getDraftString(applicationDraft, "title");
-  const companyName = getDraftString(applicationDraft, "companyName");
-  const description = getDraftString(applicationDraft, "description");
-  const location = getDraftString(applicationDraft, "location");
-  const url = getDraftString(applicationDraft, "url");
-  const jobType = getDraftString(applicationDraft, "jobType");
-  const status = getDraftString(applicationDraft, "status");
+  const title = getPayloadString(applicationDraft, "title");
+  const companyName = getPayloadString(applicationDraft, "companyName");
+  const description = getPayloadString(applicationDraft, "description");
+  const location = getPayloadString(applicationDraft, "location");
+  const url = getPayloadString(applicationDraft, "url");
+  const jobType = getPayloadString(applicationDraft, "jobType");
+  const status = getPayloadString(applicationDraft, "status");
 
   if (!title || !companyName || !jobType || !status) {
     return {
@@ -144,19 +213,41 @@ export async function importExtractedJobApplication(applicationDraft) {
     };
   }
 
-  const application = await prisma.jobApplication.create({
-    data: {
-      clerkId: userId,
-      title,
-      companyName,
-      description: description || null,
-      url: normalizedUrl.url || null,
-      location: location || null,
-      jobType,
-      status,
-    },
-    select: getApplicationSelect(userId),
-  });
+  const cvUpload = await uploadOptionalCvFile(applicationDraft, userId);
+
+  if (!cvUpload.success) {
+    return {
+      success: false,
+      message: cvUpload.message,
+    };
+  }
+
+  let application;
+
+  try {
+    application = await prisma.jobApplication.create({
+      data: {
+        clerkId: userId,
+        title,
+        companyName,
+        description: description || null,
+        url: normalizedUrl.url || null,
+        location: location || null,
+        jobType,
+        status,
+        ...cvUpload.metadata,
+      },
+      select: getApplicationSelect(userId),
+    });
+  } catch (error) {
+    await deleteCvFileQuietly(cvUpload.metadata?.cvFileUrl);
+    console.error("Application import failed:", error);
+
+    return {
+      success: false,
+      message: "Application could not be imported.",
+    };
+  }
 
   revalidatePath("/applications");
 
@@ -322,27 +413,81 @@ export async function updateJobApplication(applicationId, formData) {
     };
   }
 
-  const result = await prisma.jobApplication.updateMany({
+  const existingApplication = await prisma.jobApplication.findFirst({
     where: {
       id: applicationId,
       clerkId: userId,
     },
-    data: {
-      title,
-      companyName,
-      description: description || null,
-      url: url || null,
-      location: location || null,
-      jobType,
-      status,
+    select: {
+      id: true,
+      cvFileUrl: true,
     },
   });
 
-  if (result.count === 0) {
+  if (!existingApplication) {
     return {
       success: false,
       message: "Application could not be updated.",
     };
+  }
+
+  const cvFile = getCvFileFromFormData(formData);
+  const removeCvFile = shouldRemoveCvFile(formData);
+  const cvData = {};
+  let uploadedCvFileUrl = "";
+
+  if (cvFile) {
+    const cvUpload = await uploadCvFile({
+      file: cvFile,
+      userId,
+    });
+
+    if (!cvUpload.success) {
+      return {
+        success: false,
+        message: cvUpload.message,
+      };
+    }
+
+    Object.assign(cvData, cvUpload.metadata);
+    uploadedCvFileUrl = cvUpload.metadata.cvFileUrl;
+  } else if (removeCvFile) {
+    Object.assign(cvData, {
+      cvFileUrl: null,
+      cvFileName: null,
+      cvFileType: null,
+      cvFileSize: null,
+    });
+  }
+
+  try {
+    await prisma.jobApplication.update({
+      where: {
+        id: applicationId,
+      },
+      data: {
+        title,
+        companyName,
+        description: description || null,
+        url: url || null,
+        location: location || null,
+        jobType,
+        status,
+        ...cvData,
+      },
+    });
+  } catch (error) {
+    await deleteCvFileQuietly(uploadedCvFileUrl);
+    console.error("Application update failed:", error);
+
+    return {
+      success: false,
+      message: "Application could not be updated.",
+    };
+  }
+
+  if ((cvFile || removeCvFile) && existingApplication.cvFileUrl) {
+    await deleteCvFileQuietly(existingApplication.cvFileUrl);
   }
 
   const application = await prisma.jobApplication.findFirst({
@@ -566,19 +711,31 @@ export async function deleteJobApplication(applicationId) {
     };
   }
 
-  const result = await prisma.jobApplication.deleteMany({
+  const application = await prisma.jobApplication.findFirst({
     where: {
       id: applicationId,
       clerkId: userId,
     },
+    select: {
+      id: true,
+      cvFileUrl: true,
+    },
   });
 
-  if (result.count === 0) {
+  if (!application) {
     return {
       success: false,
       message: "Application could not be deleted.",
     };
   }
+
+  await prisma.jobApplication.delete({
+    where: {
+      id: application.id,
+    },
+  });
+
+  await deleteCvFileQuietly(application.cvFileUrl);
 
   revalidatePath("/applications");
 

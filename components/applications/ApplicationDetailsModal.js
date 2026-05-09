@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import CVFileUpload from "@/components/applications/CVFileUpload";
+import CompanyLogo from "@/components/applications/CompanyLogo";
 import DeleteApplicationDialog from "@/components/applications/DeleteApplicationDialog";
 import NotesPanel from "@/components/applications/NotesPanel";
 import { ACCEPTED_STATUS } from "@/constants/applicationStatuses";
+import { formatCvFileSize } from "@/constants/cvFiles";
 import { JOB_TYPE_OPTIONS } from "@/constants/jobTypes";
 import {
   getDisplayValue,
@@ -59,6 +62,9 @@ export default function ApplicationDetailsModal({
   const [deletingNoteId, setDeletingNoteId] = useState("");
   const [savingNoteId, setSavingNoteId] = useState("");
   const [noteEditErrors, setNoteEditErrors] = useState({});
+  const [cvFile, setCvFile] = useState(null);
+  const [cvFileError, setCvFileError] = useState("");
+  const [removeCvFile, setRemoveCvFile] = useState(false);
   const [noteEditValues, setNoteEditValues] = useState(() =>
     getNoteEditValues(application.notes),
   );
@@ -98,12 +104,19 @@ export default function ApplicationDetailsModal({
     }
   }
 
+  function resetCvFileState() {
+    setCvFile(null);
+    setCvFileError("");
+    setRemoveCvFile(false);
+  }
+
   function handleEditClick() {
     setFormValues(getEditFormValues(application));
     setNoteEditValues(getNoteEditValues(application.notes));
     setNoteEditErrors({});
     setNoteDeleteError("");
     setSaveError("");
+    resetCvFileState();
     setIsEditing(true);
   }
 
@@ -114,6 +127,7 @@ export default function ApplicationDetailsModal({
       setNoteEditErrors({});
       setNoteDeleteError("");
       setSaveError("");
+      resetCvFileState();
       setIsEditing(false);
     }
   }
@@ -144,6 +158,11 @@ export default function ApplicationDetailsModal({
       url: formValues.url.trim(),
     };
 
+    if (cvFileError) {
+      setSaveError(cvFileError);
+      return;
+    }
+
     if (
       !nextValues.title ||
       !nextValues.companyName ||
@@ -158,6 +177,14 @@ export default function ApplicationDetailsModal({
     Object.entries(nextValues).forEach(([key, value]) => {
       formData.append(key, value);
     });
+
+    if (cvFile) {
+      formData.append("cvFile", cvFile);
+    }
+
+    if (removeCvFile) {
+      formData.append("removeCvFile", "true");
+    }
 
     const previousStatus = application.status;
     const shouldCelebrateAccepted =
@@ -176,6 +203,7 @@ export default function ApplicationDetailsModal({
 
       if (result.success) {
         setFormValues(getEditFormValues(result.application));
+        resetCvFileState();
         setIsEditing(false);
         return;
       }
@@ -413,6 +441,15 @@ export default function ApplicationDetailsModal({
   const updatedDate = getDisplayValue(formatDate(application.updatedAt));
   const safeJobUrl = getSafeExternalUrl(application.url);
   const jobUrl = getDisplayValue(application.url);
+  const existingCvFile = application.cvFileName
+    ? {
+        fileName: application.cvFileName,
+        fileSize: application.cvFileSize,
+        fileType: application.cvFileType,
+        viewUrl: `/applications/${application.id}/cv`,
+        downloadUrl: `/applications/${application.id}/cv?download=1`,
+      }
+    : null;
 
   return (
     <div
@@ -429,53 +466,54 @@ export default function ApplicationDetailsModal({
         <form onSubmit={handleSave}>
           <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-teal-700">
-                Application details
-              </p>
-              <div className="mt-1 flex items-start gap-2">
-                {isEditing ? (
-                  <input
-                    id="application-details-title"
-                    name="title"
-                    type="text"
-                    required
-                    value={formValues.title}
-                    onChange={handleFieldChange}
-                    disabled={isSaving}
-                    className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-xl font-semibold text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-2xl"
-                  />
-                ) : (
-                  <h2
-                    id="application-details-title"
-                    className="min-w-0 break-words text-2xl font-semibold text-slate-950"
-                  >
-                    {title}
-                  </h2>
-                )}
+              <div className="flex min-w-0 items-start gap-3">
+                <CompanyLogo companyName={application.companyName} size="lg" />
 
-                {!isEditing ? (
-                  <button
-                    type="button"
-                    onClick={handleEditClick}
-                    aria-label="Edit application"
-                    className="mt-0.5 rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-teal-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-                  >
-                    <svg
-                      aria-hidden="true"
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
+                <div className="flex min-w-0 flex-1 items-start gap-2 pt-0.5">
+                  {isEditing ? (
+                    <input
+                      id="application-details-title"
+                      name="title"
+                      type="text"
+                      required
+                      value={formValues.title}
+                      onChange={handleFieldChange}
+                      disabled={isSaving}
+                      className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-xl font-semibold text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-2xl"
+                    />
+                  ) : (
+                    <h2
+                      id="application-details-title"
+                      className="min-w-0 break-words text-2xl font-semibold text-slate-950"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="m16.86 4.49 2.65 2.65M5 19h3.15L18.28 8.87a1.87 1.87 0 0 0 0-2.65l-.5-.5a1.87 1.87 0 0 0-2.65 0L5 15.85V19Z"
-                      />
-                    </svg>
-                  </button>
-                ) : null}
+                      {title}
+                    </h2>
+                  )}
+
+                  {!isEditing ? (
+                    <button
+                      type="button"
+                      onClick={handleEditClick}
+                      aria-label="Edit application"
+                      className="mt-0.5 shrink-0 rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-teal-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="m16.86 4.49 2.65 2.65M5 19h3.15L18.28 8.87a1.87 1.87 0 0 0 0-2.65l-.5-.5a1.87 1.87 0 0 0-2.65 0L5 15.85V19Z"
+                        />
+                      </svg>
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
 
@@ -563,6 +601,30 @@ export default function ApplicationDetailsModal({
                       </select>
                     </EditField>
 
+                    <div className="sm:col-span-2">
+                      <CVFileUpload
+                        id="edit-application-cv"
+                        selectedFile={cvFile}
+                        existingFile={existingCvFile}
+                        isExistingFileRemoved={removeCvFile}
+                        disabled={isSaving || isAnyNoteSaving}
+                        errorMessage={cvFileError}
+                        onFileSelect={(file) => {
+                          setCvFile(file);
+                          setRemoveCvFile(false);
+                          setSaveError("");
+                        }}
+                        onFileRemove={() => setCvFile(null)}
+                        onExistingFileRemove={() => {
+                          setRemoveCvFile(true);
+                          setCvFile(null);
+                          setSaveError("");
+                        }}
+                        onExistingFileRestore={() => setRemoveCvFile(false)}
+                        onErrorChange={setCvFileError}
+                      />
+                    </div>
+
                     <DetailItem label="Created date">{createdDate}</DetailItem>
 
                     <DetailItem label="Updated date">{updatedDate}</DetailItem>
@@ -635,6 +697,49 @@ export default function ApplicationDetailsModal({
 
                     <DetailItem label="Updated date">{updatedDate}</DetailItem>
                   </dl>
+
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-semibold text-slate-500">
+                      CV / Resume
+                    </p>
+                    {existingCvFile ? (
+                      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-950">
+                            {existingCvFile.fileName}
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {[
+                              existingCvFile.fileSize
+                                ? formatCvFileSize(existingCvFile.fileSize)
+                                : "",
+                              existingCvFile.fileType,
+                            ]
+                              .filter(Boolean)
+                              .join(" | ")}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <a
+                            href={existingCvFile.viewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                          >
+                            View
+                          </a>
+                          <a
+                            href={existingCvFile.downloadUrl}
+                            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                          >
+                            Download
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-700">N/A</p>
+                    )}
+                  </div>
 
                   <div className="rounded-lg border border-slate-200 bg-white p-4">
                     <p className="text-xs font-semibold text-slate-500">
